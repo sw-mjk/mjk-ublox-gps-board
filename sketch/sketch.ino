@@ -2,10 +2,12 @@
  * MJK Ublox GPS Board - MCU firmware
  * =====================================
  * Responsibilities:
- *   1) Receive correction data from Linux (as a hex string), decode it and write it to the X20P
- *   2) Read the X20P's NMEA output and forward each sentence back to Linux
+ *   1) Receive correction data from Linux (as a hex string), decode it and write it to
+ *      the GNSS module
+ *   2) Read the GNSS module's NMEA output and forward each sentence back to Linux
  *
- * Wiring: connect the X20P UART TX/RX to D0/D1 and share a common ground.
+ * Wiring: connect the GNSS module UART TX/RX to D0/D1 and share a common ground.
+ * Supported modules: u-blox ZED-X20P (all-band) and u-blox ZED-F9P (dual-band).
  *
  * WARNING - read before changing anything:
  *   - Serial is the App Lab console; D0/D1 is Serial1. Do not mix them up.
@@ -18,7 +20,7 @@
 #include <Arduino_RouterBridge.h>
 
 #define GNSS_SERIAL Serial1     // D0/D1 = USART1
-#define GNSS_BAUD   38400       // X20P default
+#define GNSS_BAUD   38400       // default for both ZED-X20P and ZED-F9P
 
 static uint8_t hexVal(char c) {
   if (c >= '0' && c <= '9') return c - '0';
@@ -27,7 +29,7 @@ static uint8_t hexVal(char c) {
   return 0;
 }
 
-// Linux sends a hex string -> decode it into bytes written to the X20P
+// Linux sends a hex string -> decode it into bytes written to the GNSS module
 static void pushBytes(String hex) {
   for (size_t i = 0; i + 1 < hex.length(); i += 2) {
     uint8_t b = (hexVal(hex[i]) << 4) | hexVal(hex[i + 1]);

@@ -5,7 +5,8 @@ MJK Ublox GPS Board - Linux-side main program (Arduino UNO Q / App Lab, runs in 
 
 Responsibilities:
   1) Connect to an NTRIP server, pull correction data, forward it to the MCU over the bridge
-  2) Parse NMEA coming back from the X20P module and report position every gga_interval seconds
+  2) Parse the NMEA coming back from the GNSS module (ZED-X20P or ZED-F9P) and report
+     position every gga_interval seconds
   3) Serve a web configuration UI; persist credentials to config.json
 
 Before changing anything, read this:
@@ -462,7 +463,7 @@ def config_complete(cfg):
 
 
 class GnssState:
-    """X20P positioning results.
+    """Positioning results from the GNSS module (ZED-X20P or ZED-F9P).
 
     Everything is recorded unconditionally (including invalid / 0,0); the validity filter
     lives only in best_gga(). That way the UI can tell "no antenna" apart from "app hung".

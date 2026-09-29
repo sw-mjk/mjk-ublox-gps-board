@@ -1,11 +1,14 @@
 # MJK Ublox GPS Board
 
-An RTK high-precision positioning application for the Arduino UNO Q, built around the
-u-blox ZED-X20P module. Enter your PointPerfect credentials in a web page and it runs.
-The configuration is stored on the board and can be changed at any time without
-reflashing the firmware.
+An RTK high-precision positioning application for the Arduino UNO Q. It supports two
+GNSS modules, both taking PointPerfect corrections over NTRIP: the all-band
+**u-blox ZED-X20P** and the dual-band **u-blox ZED-F9P**. Enter your PointPerfect
+credentials in a web page and it runs. The configuration is stored on the board and can
+be changed at any time without reflashing the firmware.
 
-<img src="images/MJK-Ublox-X20P-1.jpg" alt="MJK Ublox X20P module" width="520">
+| MJK Ublox F9P | MJK Ublox X20P |
+|---|---|
+| <img src="images/MJK-Ublox-F9P-1.jpg" alt="MJK Ublox F9P module" width="340"> | <img src="images/MJK-Ublox-X20P-1.jpg" alt="MJK Ublox X20P module" width="340"> |
 
 ---
 
@@ -14,15 +17,34 @@ reflashing the firmware.
 ### Requirements
 
 - Arduino UNO Q with **Arduino Zephyr Core 0.55.0 or later** flashed
-- ZED-X20P module with its UART wired to UNO Q **D0/D1** and a common ground
+- One of the supported GNSS modules, with its UART wired to UNO Q **D0/D1** and a
+  common ground:
+  - **u-blox ZED-X20P** (all-band)
+  - **u-blox ZED-F9P** (dual-band)
 - An active multi-band antenna (e.g. ANN-MB2-00) with a proper ground plane
 - The board connected to Wi-Fi
 
-| Arduino UNO Q | MJK Ublox X20P module |
-|---|---|
-| <img src="images/Arduino-UNO-Q.png" alt="Arduino UNO Q" width="340"> | <img src="images/MJK-Ublox-X20P-2.jpg" alt="MJK Ublox X20P module" width="340"> |
+| Arduino UNO Q | MJK Ublox F9P | MJK Ublox X20P |
+|---|---|---|
+| <img src="images/Arduino-UNO-Q.png" alt="Arduino UNO Q" width="250"> | <img src="images/MJK-Ublox-F9P-2.jpg" alt="MJK Ublox F9P module" width="250"> | <img src="images/MJK-Ublox-X20P-2.jpg" alt="MJK Ublox X20P module" width="250"> |
 
 The module plugs onto the UNO Q headers; its UART is wired to **D0/D1**.
+
+### Supported GNSS modules
+
+Both modules run the same application against the same PointPerfect SPARTN stream - no
+code change and no different mountpoint. What differs is behaviour:
+
+| | ZED-X20P | ZED-F9P |
+|---|---|---|
+| Bands | All-band (L1/L2/L5/L6) | Dual-band (L1/L2) |
+| Time to first RTK fixed | Shorter | Longer - it needs more epochs to resolve ambiguities |
+| HDOP while converging | Usually low | Can read 3-4 during acquisition, then settles near 1 |
+| GPS L5 corrections | Not used by default under PointPerfect Flex - see **UBX-21038688** | Not applicable |
+
+If the F9P sits in `RTK-FLOAT` for a long time, check two things first: the firmware is
+**HPG 1.32 or later** (SPARTN 2.x requires it), and `CFG-SPARTN-USE_SOURCE` is set to
+**IP** rather than L-band - otherwise SPARTN arriving over the UART is ignored.
 
 ### Steps
 
@@ -89,7 +111,9 @@ configuration, no data from the module, connected but no data, and so on).
 | "Wrong username or password" | Copy the credentials again from the Thingstream Credentials tab |
 | "Mountpoint does not exist" | Make sure the mountpoint matches the Thing's format - a SPARTN Thing needs `NEAR-SPARTN` |
 | Connected but no data | Check the bootstrap coordinates; try a different mountpoint |
-| Stops at RTK-FLOAT and will not converge | See u-blox application note **UBX-21038688** (under PointPerfect Flex the X20P does not use GPS L5 by default) |
+| X20P stops at RTK-FLOAT and will not converge | See u-blox application note **UBX-21038688** (under PointPerfect Flex the X20P does not use GPS L5 by default) |
+| F9P stays in RTK-FLOAT for a long time | Expected while converging - it takes longer than the X20P. If it never fixes, check the firmware is **HPG 1.32 or later** and `CFG-SPARTN-USE_SOURCE` is **IP** |
+| F9P reports a high HDOP (3-4) right after power-on | Normal during acquisition; it settles to about 1 once all satellites are locked |
 | Configuration is lost after a restart | A yellow banner will be showing; usually a directory permission problem |
 | "Lost contact with the board" | Check the board's power and network, then reload the page |
 
@@ -118,7 +142,7 @@ configuration, no data from the module, connected but no data, and so on).
 | File | Purpose |
 |---|---|
 | `app.yaml` | App Lab manifest: name, icon, ports, bricks used |
-| `sketch/sketch.ino` | MCU firmware: writes correction data to the X20P, reports NMEA back |
+| `sketch/sketch.ino` | MCU firmware: writes correction data to the GNSS module, reports NMEA back |
 | `sketch/sketch.yaml` | Zephyr platform configuration |
 | `python/main.py` | Linux-side main program: NTRIP connection, configuration, web API |
 | `assets/index.html` | Configuration and status page |
