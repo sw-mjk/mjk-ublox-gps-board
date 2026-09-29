@@ -1,0 +1,11 @@
+# App Lab build cache
+.cache/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local NTRIP credentials - never commit these, and never ship them in a release
+config.json
+config.json.bad
+.config-*.tmp

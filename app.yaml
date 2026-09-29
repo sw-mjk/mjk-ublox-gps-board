@@ -1,0 +1,18 @@
+# app.yaml: The main configuration file for your Arduino App.
+# This file describes the application's metadata and properties.
+
+# The user-visible name of the application.
+name: MJK Ublox GPS Board
+
+# The icon for the application, can be an emoji or a short string.
+icon: 🛰️
+
+# A list of network ports that the application exposes.
+# 7000 is the WebUI brick's port. Without it declared here the configuration page is only
+# reachable inside the container and a browser cannot open http://<board-ip>:7000/.
+ports:
+  - 7000
+
+# A list of bricks used by this application.
+bricks:
+  - arduino:web_ui: {}

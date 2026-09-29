@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MJK Ublox GPS Board</title>
+<style>
+  /* Light theme with strong contrast so it stays readable in direct sunlight.
+     Status is never conveyed by colour alone. */
+  :root {
+    --bg: #f4f6f8; --card: #fff; --line: #d8dee6; --fg: #1a2027;
+    --dim: #64748b; --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --idle: #94a3b8; --ok: #15803d; --warn: #b45309; --bad: #b91c1c; --info: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 16px 14px 48px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+  h1 { font-size: 18px; margin: 0; flex: 1 1 auto; }
+  .pill {
+    padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px;
+    color: #fff; background: var(--idle); white-space: nowrap;
+  }
+  .pill.q-ok   { background: var(--ok); }
+  .pill.q-warn { background: var(--warn); }
+  .pill.q-info { background: var(--info); }
+  .pill.q-bad  { background: var(--bad); }
+  .pill.q-idle { background: var(--idle); }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+          padding: 14px 16px; margin-bottom: 12px; }
+  .card h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+             color: var(--dim); margin: 0 0 10px; font-weight: 700; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 18px; }
+  .kv { min-width: 0; }
+  .kv .k { font-size: 12px; color: var(--dim); }
+  .kv .v { font-family: var(--mono); font-size: 16px; word-break: break-all; }
+  .kv .v.big { font-size: 19px; font-weight: 600; }
+
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+         background: var(--idle); margin-right: 6px; vertical-align: baseline; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); }
+  .dot.bad { background: var(--bad); } .dot.info { background: var(--info); }
+
+  .err { color: var(--bad); font-weight: 600; margin-top: 8px; word-break: break-word; }
+
+  label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 4px; }
+  input[type=text], input[type=password], input[type=number] {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px;
+    font: inherit; font-family: var(--mono); background: #fff; color: var(--fg);
+  }
+  input:focus { outline: 2px solid #93c5fd; outline-offset: 0; border-color: #93c5fd; }
+  .row { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .row1 { margin-bottom: 10px; }
+  .pwd-wrap { position: relative; }
+  .pwd-wrap button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    background: none; border: 0; color: var(--info); cursor: pointer; font: inherit; font-size: 12px; }
+  .check { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--dim); margin: 2px 0 12px; }
+  .check input { width: auto; }
+
+  .btns { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+  button.act { padding: 10px 18px; border-radius: 8px; border: 1px solid var(--line);
+               background: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  button.act.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+  button.act:disabled { opacity: .5; cursor: default; }
+  a.act { padding: 10px 18px; border-radius: 8px; background: #15803d; color: #fff;
+          text-decoration: none; font-weight: 600; display: inline-block; }
+
+  .note { font-size: 12px; color: var(--dim); margin-top: 10px; }
+  .note code { font-family: var(--mono); }
+
+  .banner { padding: 10px 13px; border-radius: 8px; margin-bottom: 10px; font-size: 14px;
+            border-left: 4px solid; }
+  .banner.warn { background: #fffbeb; border-color: var(--warn); color: #78350f; }
+  .banner.bad  { background: #fef2f2; border-color: var(--bad);  color: #7f1d1d; }
+  .banner.info { background: #eff6ff; border-color: var(--info); color: #1e3a8a; }
+
+  details summary { cursor: pointer; color: var(--dim); font-size: 13px; }
+  pre.log { font-family: var(--mono); font-size: 11.5px; line-height: 1.5; max-height: 240px;
+            overflow: auto; background: #0f172a; color: #cbd5e1; padding: 10px;
+            border-radius: 7px; margin: 10px 0 0; white-space: pre-wrap; word-break: break-all; }
+  .offline { opacity: .55; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>MJK Ublox GPS Board</h1>
+    <div id="pill" class="pill q-idle" aria-live="polite">Connecting…</div>
+  </header>
+
+  <div id="banners"></div>
+
+  <section class="card" id="posCard">
+    <h2>Position</h2>
+    <div class="grid">
+      <div class="kv"><div class="k">Latitude</div><div class="v big" id="vLat">—</div></div>
+      <div class="kv"><div class="k">Longitude</div><div class="v big" id="vLon">—</div></div>
+      <div class="kv"><div class="k">Altitude</div><div class="v" id="vAlt">—</div></div>
+      <div class="kv"><div class="k">Satellites</div><div class="v" id="vSv">—</div></div>
+      <div class="kv"><div class="k">HDOP</div><div class="v" id="vHdop">—</div></div>
+      <div class="kv"><div class="k">Fix age</div><div class="v" id="vAge">—</div></div>
+    </div>
+  </section>
+
+  <section class="card" id="linkCard">
+    <h2>Correction link</h2>
+    <div class="grid">
+      <div class="kv"><div class="k">Status</div>
+        <div class="v"><span class="dot" id="dLink"></span><span id="vLink">—</span></div></div>
+      <div class="kv"><div class="k">Server</div><div class="v" id="vServer">—</div></div>
+      <div class="kv"><div class="k">Received</div><div class="v" id="vBytes">—</div></div>
+      <div class="kv"><div class="k">Rate</div><div class="v" id="vRate">—</div></div>
+      <div class="kv"><div class="k">GGA sent</div><div class="v" id="vGga">—</div></div>
+      <div class="kv"><div class="k">GGA position source</div><div class="v" id="vSrc">—</div></div>
+      <div class="kv"><div class="k">Reconnects</div><div class="v" id="vReconn">—</div></div>
+      <div class="kv"><div class="k">Push errors</div><div class="v" id="vPushErr">—</div></div>
+    </div>
+    <div class="err" id="vLastErr" hidden></div>
+  </section>
+
+  <section class="card">
+    <h2>Configuration</h2>
+    <div class="row">
+      <div><label for="f_host">NTRIP server</label>
+        <input type="text" id="f_host" autocomplete="off" spellcheck="false"></div>
+      <div><label for="f_port">Port</label>
+        <input type="number" id="f_port" min="1" max="65535"></div>
+    </div>
+    <div class="row1"><label for="f_mountpoint">Mountpoint</label>
+      <input type="text" id="f_mountpoint" autocomplete="off" spellcheck="false"></div>
+    <div class="row1"><label for="f_username">Username</label>
+      <input type="text" id="f_username" autocomplete="off" spellcheck="false"></div>
+    <div class="row1"><label for="f_password">Password</label>
+      <div class="pwd-wrap">
+        <input type="password" id="f_password" autocomplete="new-password">
+        <button type="button" id="btnReveal">Show</button>
+      </div>
+    </div>
+    <div class="check">
+      <input type="checkbox" id="f_pwd_clear">
+      <label for="f_pwd_clear" style="margin:0">Clear saved password</label>
+    </div>
+    <div class="row3">
+      <div><label for="f_bootlat">Bootstrap latitude</label>
+        <input type="number" id="f_bootlat" step="0.000001"></div>
+      <div><label for="f_bootlon">Bootstrap longitude</label>
+        <input type="number" id="f_bootlon" step="0.000001"></div>
+      <div><label for="f_gga">GGA interval (s)</label>
+        <input type="number" id="f_gga" step="0.5" min="1" max="30"></div>
+    </div>
+
+    <div class="btns">
+      <button class="act primary" id="btnSave">Save &amp; apply</button>
+      <button class="act" id="btnStop">Stop</button>
+      <a class="act" id="btnSignup" target="_blank" rel="noopener noreferrer">Get PointPerfect →</a>
+    </div>
+    <div class="err" id="formMsg" hidden></div>
+
+    <p class="note">
+      First time here? Register with PointPerfect, create a Thing, then copy the server,
+      port, username, password and mountpoint from its <b>Credentials</b> tab into the
+      fields above. Configuration is stored in <code id="vCfgPath">—</code>.
+    </p>
+  </section>
+
+  <section class="card">
+    <details id="evtDetails">
+      <summary>Run log</summary>
+      <pre class="log" id="vLog">Expand to load…</pre>
+    </details>
+  </section>
+
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ---- state ---- */
+let dirty = false;            // set once the user edits the form; stops polling from overwriting input
+let formLoaded = false;
+let inFlight = false;
+let failures = 0;
+let pollTimer = null;
+let lastStatus = null;
+let lastPollError = null;     // reason for the most recent poll failure, shown in the offline banner
+
+const STATE_TEXT = {
+  stopped: "Stopped", connecting: "Connecting", connected: "Connected",
+  reconnecting: "Reconnecting", error: "Error"
+};
+
+function num(v, d) {
+  return (v === null || v === undefined || typeof v !== "number") ? "—" : v.toFixed(d);
+}
+function bytes(n) {
+  if (!n) return "0 B";
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1048576).toFixed(2) + " MB";
+}
+/* Server-supplied strings are always rendered with textContent, never innerHTML */
+function setText(el, v) { el.textContent = (v === null || v === undefined || v === "") ? "—" : String(v); }
+
+function qualityClass(q) {
+  if (q === "RTK-FIXED") return "q-ok";
+  if (q === "RTK-FLOAT") return "q-warn";
+  if (q === "DGPS" || q === "SPS" || q === "PPS") return "q-info";
+  if (q === "invalid") return "q-idle";
+  return "q-bad";
+}
+
+/* ---- rendering ---- */
+function render(s) {
+  // If the API response does not have the expected shape, throw so the offline banner
+  // shows the raw content - that is what makes a failure diagnosable.
+  if (!s || !s.gnss || !s.ntrip || !s.config) {
+    throw new Error("unexpected API response: " + JSON.stringify(s).slice(0, 200));
+  }
+  lastStatus = s;
+  document.body.classList.remove("offline");
+
+  /* header pill shows the fix quality */
+  const q = s.gnss.quality;
+  const pill = $("pill");
+  pill.className = "pill " + qualityClass(q);
+  pill.textContent = q === "RTK-FIXED" ? "RTK fixed" : (q === "invalid" ? "No fix" : q);
+
+  /* position */
+  setText($("vLat"), s.gnss.lat === null ? "—" : num(s.gnss.lat, 7));
+  setText($("vLon"), s.gnss.lon === null ? "—" : num(s.gnss.lon, 7));
+  setText($("vAlt"), s.gnss.alt === null ? "—" : num(s.gnss.alt, 1) + " m");
+  setText($("vSv"), s.gnss.numSV);
+  setText($("vHdop"), num(s.gnss.hdop, 2));
+  setText($("vAge"), s.gnss.age === null ? "—" : s.gnss.age + " s ago");
+
+  /* link */
+  const n = s.ntrip;
+  const dot = $("dLink");
+  const cls = { connected: "ok", connecting: "info", reconnecting: "warn",
+                error: "bad", stopped: "" }[n.state] || "";
+  dot.className = "dot " + cls;
+  setText($("vLink"), (STATE_TEXT[n.state] || n.state) +
+    (n.state === "connected" && n.connected_for !== null ? " (" + Math.round(n.connected_for) + " s)" : ""));
+  setText($("vServer"), n.host ? n.host + ":" + n.port + "/" + n.mountpoint : "—");
+  setText($("vBytes"), bytes(n.bytes_total));
+  setText($("vRate"), n.bytes_per_sec ? n.bytes_per_sec.toFixed(0) + " B/s" : "—");
+  setText($("vGga"), n.gga_sent + " sent");
+  setText($("vSrc"), n.gga_source === "module" ? "module fix" :
+                     (n.gga_source === "bootstrap" ? "bootstrap coordinates" : "—"));
+  setText($("vReconn"), n.reconnects);
+  setText($("vPushErr"), n.push_errors);
+
+  const err = $("vLastErr");
+  if (n.last_error) { err.hidden = false; err.textContent = "⚠ " + n.last_error; }
+  else { err.hidden = true; err.textContent = ""; }
+
+  setText($("vCfgPath"), s.config.path);
+
+  /* The form is populated on first load and again after a successful save (dirty flag) */
+  if (!formLoaded && !dirty) fillForm(s.config);
+
+  renderBanners(s);
+}
+
+function fillForm(c) {
+  $("f_host").value = c.host || "";
+  $("f_port").value = c.port ?? "";
+  $("f_mountpoint").value = c.mountpoint || "";
+  $("f_username").value = c.username || "";
+  $("f_password").value = "";
+  $("f_password").placeholder = c.password_set ? "saved (leave blank to keep)" : "enter password";
+  $("f_bootlat").value = c.bootstrap_lat ?? 0;
+  $("f_bootlon").value = c.bootstrap_lon ?? 0;
+  $("f_gga").value = c.gga_interval ?? 5;
+  $("f_pwd_clear").checked = false;
+  formLoaded = true;
+}
+
+function banner(kind, text) {
+  const d = document.createElement("div");
+  d.className = "banner " + kind;
+  d.textContent = text;              // no innerHTML here either
+  return d;
+}
+
+function renderBanners(s) {
+  const box = $("banners");
+  box.textContent = "";
+  if (!s.config.ok) {
+    box.appendChild(banner("bad", "Failed to read the configuration file: " +
+      (s.config.load_error || "unknown reason") +
+      ". Defaults are in use and the original file was left untouched."));
+  }
+  if (!s.config.writable) {
+    box.appendChild(banner("warn", "The configuration directory is not writable (" +
+      s.config.path + "). Settings apply to this run only and will be lost on restart."));
+  }
+  if (!s.config.complete) {
+    box.appendChild(banner("info", "No complete credentials yet - the correction link is not running."));
+  }
+  if (s.gnss.lines_seen === 0) {
+    box.appendChild(banner("bad", "No data from the GNSS module. Check the antenna, the D0/D1 wiring, " +
+      "and that the MCU firmware is flashed."));
+  }
+  if (s.ntrip.state === "connected" && s.ntrip.awaiting_data) {
+    box.appendChild(banner("warn", "Connected to the server but no correction data is arriving yet - " +
+      "the mountpoint may not cover your position. Try another mountpoint or check the bootstrap coordinates."));
+  }
+  if (s.ntrip.gga_source === "bootstrap" && !s.gnss.valid) {
+    box.appendChild(banner("info", "No valid fix yet - bootstrap coordinates are being reported."));
+  }
+}
+
+function renderOffline() {
+  document.body.classList.add("offline");
+  const pill = $("pill");
+  pill.className = "pill q-bad";
+  pill.textContent = "Lost contact with the board";
+  const box = $("banners");
+  box.textContent = "";
+  box.appendChild(banner("bad", "Cannot reach the application (3 consecutive request failures)." +
+    (lastPollError ? " Reason: " + lastPollError : "") +
+    " The values below are from the last successful update."));
+}
+
+/* ---- polling: self-scheduling setTimeout, never setInterval
+   (setInterval stacks requests when the board is busy) ---- */
+async function fetchJSON(url, opts, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 4000);
+  try {
+    const r = await fetch(url, Object.assign({ cache: "no-store", signal: ctrl.signal }, opts || {}));
+    const text = await r.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      // A non-JSON response (404 page, proxy error page, ...) must still surface
+      throw new Error("HTTP " + r.status + " returned non-JSON: " + text.slice(0, 200));
+    }
+    return data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function schedule() {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(poll, document.hidden ? 5000 : 1000);
+}
+
+async function poll() {
+  if (inFlight) { schedule(); return; }
+  inFlight = true;
+  try {
+    const s = await fetchJSON("/api/status");
+    failures = 0;
+    render(s);
+  } catch (e) {
+    failures++;
+    lastPollError = (e && e.message) ? e.message : String(e);
+    if (failures >= 3) renderOffline();
+  } finally {
+    inFlight = false;
+    schedule();
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) { clearTimeout(pollTimer); poll(); }
+});
+
+/* ---- form ---- */
+["f_host", "f_port", "f_mountpoint", "f_username", "f_password",
+ "f_bootlat", "f_bootlon", "f_gga", "f_pwd_clear"].forEach(id => {
+  $(id).addEventListener("input", () => { dirty = true; });
+  $(id).addEventListener("change", () => { dirty = true; });
+});
+
+$("btnReveal").addEventListener("click", () => {
+  const f = $("f_password");
+  const show = f.type === "password";
+  f.type = show ? "text" : "password";
+  $("btnReveal").textContent = show ? "Hide" : "Show";
+});
+
+function formError(msg) {
+  const el = $("formMsg");
+  el.hidden = !msg;
+  el.textContent = msg || "";
+}
+
+function collect() {
+  const body = {
+    host: $("f_host").value,
+    port: Number($("f_port").value),
+    mountpoint: $("f_mountpoint").value,
+    username: $("f_username").value,
+    bootstrap_lat: Number($("f_bootlat").value),
+    bootstrap_lon: Number($("f_bootlon").value),
+    gga_interval: Number($("f_gga").value)
+  };
+  if ($("f_pwd_clear").checked) body.password_action = "clear";
+  else if ($("f_password").value) { body.password_action = "set"; body.password = $("f_password").value; }
+  else body.password_action = "keep";
+  return body;
+}
+
+async function waitApplied(epoch) {
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 300));
+    try {
+      const s = await fetchJSON("/api/status", null, 3000);
+      if (s.ntrip.epoch >= epoch && s.ntrip.state !== "connecting") return true;
+    } catch (e) { /* occasional failures while reconnecting are normal, keep waiting */ }
+  }
+  return false;
+}
+
+$("btnSave").addEventListener("click", async () => {
+  const btn = $("btnSave");
+  formError("");
+  btn.disabled = true;
+  btn.textContent = "Applying…";
+  try {
+    const r = await fetchJSON("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(collect())
+    }, 8000);
+    if (r.ok !== true) {
+      // show the raw server response too, so a bare "save failed" never happens
+      formError(r.error || ("server did not report success: " + JSON.stringify(r).slice(0, 300)));
+      return;
+    }
+    dirty = false; formLoaded = false;      // allow one re-population from the server result
+    await waitApplied(r.epoch);
+    if (r.warnings && r.warnings.length) formError("Saved. " + r.warnings.join("; "));
+  } catch (e) {
+    formError("Save failed: " + ((e && e.message) ? e.message : e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save & apply";
+  }
+});
+
+$("btnStop").addEventListener("click", async () => {
+  const btn = $("btnStop");
+  btn.disabled = true;
+  try {
+    const r = await fetchJSON("/api/worker", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "stop" })
+    }, 5000);
+    if (r.ok !== true) formError(r.error || ("server did not report success: " + JSON.stringify(r).slice(0, 300)));
+  } catch (e) {
+    formError("Operation failed: " + ((e && e.message) ? e.message : e));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ---- run log: only polled while the panel is expanded ---- */
+let logTimer = null;
+async function pollLog() {
+  try {
+    const r = await fetchJSON("/api/events", null, 4000);
+    if (!r || !Array.isArray(r.lines)) {
+      $("vLog").textContent = "unexpected API response: " + JSON.stringify(r).slice(0, 300);
+      return;
+    }
+    $("vLog").textContent = r.lines.map(
+      l => new Date(l.t * 1000).toLocaleTimeString() + "  " + l.msg
+    ).join("\n") || "(no log entries)";
+    $("vLog").scrollTop = $("vLog").scrollHeight;
+  } catch (e) {
+    $("vLog").textContent = "Failed to load the log: " + e;
+  }
+}
+$("evtDetails").addEventListener("toggle", () => {
+  clearInterval(logTimer);
+  if ($("evtDetails").open) { pollLog(); logTimer = setInterval(pollLog, 3000); }
+});
+
+/* ---- start ---- */
+$("btnSignup").href = "https://portal.thingstream.io/register";
+poll();
+</script>
+</body>
+</html>
